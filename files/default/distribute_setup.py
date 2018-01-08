@@ -18,7 +18,7 @@ import sys
 import time
 import fnmatch
 import tempfile
-import tarfile
+import zipfile
 from distutils import log
 
 try:
@@ -46,8 +46,8 @@ except ImportError:
             args = [quote(arg) for arg in args]
         return os.spawnl(os.P_WAIT, sys.executable, *args) == 0
 
-DEFAULT_VERSION = "0.6.14"
-DEFAULT_URL = "http://pypi.python.org/packages/source/d/distribute/"
+DEFAULT_VERSION = "0.7.3"
+DEFAULT_URL = "https://pypi.python.org/packages/source/d/distribute/"
 SETUPTOOLS_FAKED_VERSION = "0.6c11"
 
 SETUPTOOLS_PKG_INFO = """\
@@ -63,16 +63,15 @@ Description: xxx
 """ % SETUPTOOLS_FAKED_VERSION
 
 
-def _install(tarball):
-    # extracting the tarball
+def _install(ziparchive):
+    # extracting the zipfile
     tmpdir = tempfile.mkdtemp()
     log.warn('Extracting in %s', tmpdir)
     old_wd = os.getcwd()
     try:
         os.chdir(tmpdir)
-        tar = tarfile.open(tarball)
-        _extractall(tar)
-        tar.close()
+        with zipfile.ZipFile(ziparchive, 'r') as zipf:
+            zipfile.ZipFile.extractall(zipf)
 
         # going in the directory
         subdir = os.path.join(tmpdir, os.listdir(tmpdir)[0])
@@ -88,16 +87,15 @@ def _install(tarball):
         os.chdir(old_wd)
 
 
-def _build_egg(egg, tarball, to_dir):
-    # extracting the tarball
+def _build_egg(egg, ziparchive, to_dir):
+    # extracting the zipfile
     tmpdir = tempfile.mkdtemp()
     log.warn('Extracting in %s', tmpdir)
     old_wd = os.getcwd()
     try:
         os.chdir(tmpdir)
-        tar = tarfile.open(tarball)
-        _extractall(tar)
-        tar.close()
+        with zipfile.ZipFile(ziparchive, 'r') as zipf:
+            zipfile.ZipFile.extractall(zipf)
 
         # going in the directory
         subdir = os.path.join(tmpdir, os.listdir(tmpdir)[0])
@@ -120,9 +118,9 @@ def _do_download(version, download_base, to_dir, download_delay):
     egg = os.path.join(to_dir, 'distribute-%s-py%d.%d.egg'
                        % (version, sys.version_info[0], sys.version_info[1]))
     if not os.path.exists(egg):
-        tarball = download_setuptools(version, download_base,
+        zipfile = download_setuptools(version, download_base,
                                       to_dir, download_delay)
-        _build_egg(egg, tarball, to_dir)
+        _build_egg(egg, zipfile, to_dir)
     sys.path.insert(0, egg)
     import setuptools
     setuptools.bootstrap_install_from = egg
@@ -183,9 +181,9 @@ def download_setuptools(version=DEFAULT_VERSION, download_base=DEFAULT_URL,
         from urllib.request import urlopen
     except ImportError:
         from urllib2 import urlopen
-    tgz_name = "distribute-%s.tar.gz" % version
-    url = download_base + tgz_name
-    saveto = os.path.join(to_dir, tgz_name)
+    zip_name = "distribute-%s.zip" % version
+    url = download_base + zip_name
+    saveto = os.path.join(to_dir, zip_name)
     src = dst = None
     if not os.path.exists(saveto):  # Avoid repeated downloads
         try:
@@ -428,57 +426,10 @@ def _relaunch():
     sys.exit(subprocess.call(args))
 
 
-def _extractall(self, path=".", members=None):
-    """Extract all members from the archive to the current working
-       directory and set owner, modification time and permissions on
-       directories afterwards. `path' specifies a different directory
-       to extract to. `members' is optional and must be a subset of the
-       list returned by getmembers().
-    """
-    import copy
-    import operator
-    from tarfile import ExtractError
-    directories = []
-
-    if members is None:
-        members = self
-
-    for tarinfo in members:
-        if tarinfo.isdir():
-            # Extract directories with a safe mode.
-            directories.append(tarinfo)
-            tarinfo = copy.copy(tarinfo)
-            tarinfo.mode = 448 # decimal for oct 0700
-        self.extract(tarinfo, path)
-
-    # Reverse sort directories.
-    if sys.version_info < (2, 4):
-        def sorter(dir1, dir2):
-            return cmp(dir1.name, dir2.name)
-        directories.sort(sorter)
-        directories.reverse()
-    else:
-        directories.sort(key=operator.attrgetter('name'), reverse=True)
-
-    # Set correct owner, mtime and filemode on directories.
-    for tarinfo in directories:
-        dirpath = os.path.join(path, tarinfo.name)
-        try:
-            self.chown(tarinfo, dirpath)
-            self.utime(tarinfo, dirpath)
-            self.chmod(tarinfo, dirpath)
-        except ExtractError:
-            e = sys.exc_info()[1]
-            if self.errorlevel > 1:
-                raise
-            else:
-                self._dbg(1, "tarfile: %s" % e)
-
-
 def main(argv, version=DEFAULT_VERSION):
     """Install or upgrade setuptools and EasyInstall"""
-    tarball = download_setuptools()
-    _install(tarball)
+    zipfile = download_setuptools()
+    _install(zipfile)
 
 
 if __name__ == '__main__':
