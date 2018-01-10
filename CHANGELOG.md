@@ -1,3 +1,7 @@
+## v1.2.3
+
+* Update version of distribute for pypi https requirement
+
 ## v1.2.2:
 
 * [COOK-2297] - more gracefully handle pip packages from VCS and
